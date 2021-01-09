@@ -31,19 +31,19 @@ class VirusTotalAPI:
 
     HTTP_RESPONSE_SUCCESS = 200
 
-    def create_markdown_table_from_virus_total(self, users_input):
+    def create_markdown_table_from_virus_total(self, users_input: str) -> str:
         """
         :param users_input: hash representation of a file (MD5, SHA-1 or SHA-256)
         :return: markdown tables of the data that return from Virus Total on that file
         """
         try:
-            virus_total_response = self.get_json_from_virus_total(users_input)
+            virus_total_response = self._get_json_from_virus_total(users_input)
 
-            scanned_files_dictionary = self.create_dictionary(virus_total_response,
-                                                              self.SCANNED_FILES_TABLE)
-            results_dictionary = self.create_dictionary(virus_total_response,
-                                                        self.RESULTS_TABLE)
-            scans_dictionary = self.create_scans_dictionary(virus_total_response)
+            scanned_files_dictionary = self._create_dictionary(virus_total_response,
+                                                               self.SCANNED_FILES_TABLE)
+            results_dictionary = self._create_dictionary(virus_total_response,
+                                                         self.RESULTS_TABLE)
+            scans_dictionary = self._create_scans_dictionary(virus_total_response)
 
             markdown_table = MarkdownTable()
             markdown_string = ""
@@ -56,27 +56,26 @@ class VirusTotalAPI:
             markdown_string += markdown_table.create_markdown_table(self.SCANS_TABLE,
                                                                     self.SCANS_COLUMNS,
                                                                     scans_dictionary)
-            print(markdown_string)
-        except ValueError as error:
-            print(f"An error occurred while trying to retrieve data from server!\nError Message: {error}")
-        except Exception as e:
-            print(f"Something went wrong while trying to fetch data from server\nError message: {e}")
 
-    def get_json_from_virus_total(self, users_input):
+            return markdown_string
+        except Exception as error:
+            raise Exception(f"An error occurred while trying to retrieve data from server!\nError message: \"{error}\"")
+
+    def _get_json_from_virus_total(self, users_input: str) -> dict:
         url = self.URL
         params = {self.PARAM_API_KEY: self.API_KEY, self.PARAM_RESOURCE: users_input}
         response = requests.get(url, params=params)
 
         if response.status_code == self.HTTP_RESPONSE_SUCCESS:
             json = response.json()
-            if not json['response_code']:
-                raise Exception(json['verbose_msg'])
+            if not json.get('response_code'):
+                raise Exception(json.get('verbose_msg'))
             else:
                 return json
         else:
             raise ValueError(f"Request from server responded error code number: {response.status_code}")
 
-    def create_dictionary(self, json_response, table_name):
+    def _create_dictionary(self, json_response: dict, table_name: str) -> dict:
         """
         :param json_response: Virus Total's json response on the submitted file
         :param table_name: The table on which we retrieve the data
@@ -89,20 +88,16 @@ class VirusTotalAPI:
 
         return new_dictionary
 
-    def create_scans_dictionary(self, json_response):
+    def _create_scans_dictionary(self, json_response: dict) -> dict:
         """
         :param json_response: Virus Total's json response on the submitted file
         :return: Dictionary in which the keys are the 'Scan Origin' and the values are the 'Scan Result'
         """
         new_dictionary = {}
-        scans_origin = []
-        scans_result = []
         scans_dictionary_from_json = json_response.get(self.SCANS_FIELDS)
 
         for value in scans_dictionary_from_json:
             new_dictionary[value] = scans_dictionary_from_json[value].get(self.RESULT)
-            scans_origin.append(value)
-            scans_result.append(scans_dictionary_from_json[value].get(self.RESULT))
 
         return new_dictionary
 
@@ -110,7 +105,7 @@ class VirusTotalAPI:
 class MarkdownTable:
     SCANS_TABLE = 'Scans'
 
-    def create_initial_markdown_string(self, table_name, table_columns):
+    def _create_initial_markdown_string(self, table_name: str, table_columns: list) -> str:
         """
         :param table_name: The name of the table to add to the beginning of the markdown string
         :param table_columns: The columns of the table to add to the markdown string
@@ -129,21 +124,21 @@ class MarkdownTable:
 
         return markdown_string
 
-    def create_markdown_table(self, table_name, table_columns, dictionary):
+    def create_markdown_table(self, table_name: str, table_columns: list, data: dict) -> str:
         """
         :param table_name: The name of the current table
         :param table_columns: The names of the table columns
-        :param dictionary: The data of the current table
+        :param data: The data of the current table
         :return: Markdown string which represents the full table data
         """
-        markdown_string = self.create_initial_markdown_string(table_name, table_columns)
+        markdown_string = self._create_initial_markdown_string(table_name, table_columns)
 
         if table_name != self.SCANS_TABLE:
-            for item in dictionary:
-                markdown_string += f" {dictionary[item]} |"
+            for item in data:
+                markdown_string += f" {data[item]} |"
         else:
-            for item in dictionary:
-                markdown_string += f"\n| {item} | {dictionary[item]} |"
+            for item in data:
+                markdown_string += f"\n| {item} | {data[item]} |"
 
         markdown_string += "\n"
 
@@ -153,4 +148,4 @@ class MarkdownTable:
 if __name__ == "__main__":
     virus_total_api = VirusTotalAPI()
     user_input = input("Please insert a hash representation of a file: ")
-    virus_total_api.create_markdown_table_from_virus_total(user_input)
+    print(virus_total_api.create_markdown_table_from_virus_total(user_input))
